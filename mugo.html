@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Efootball League Manager</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0b132b;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    .container {
+      background: #1c2541;
+      border-radius: 10px;
+      padding: 20px;
+      margin: 20px auto;
+      width: 90%;
+      max-width: 700px;
+    }
+    button {
+      background: #3a506b;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    input {
+      padding: 8px;
+      margin: 5px;
+      border-radius: 5px;
+      border: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #5bc0be;
+      padding: 5px;
+      text-align: center;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Efootball League Manager ⚽</h1>
+
+  <div id="home" class="container">
+    <h2>Welcome</h2>
+    <button onclick="createLeague()">Create League</button>
+    <button onclick="showJoin()">Join League</button>
+  </div>
+
+  <div id="joinLeague" class="container hidden">
+    <h2>Join League</h2>
+    <input type="text" id="joinCode" placeholder="Enter league code" />
+    <button onclick="joinLeague()">Join</button>
+    <button onclick="goHome()">Back</button>
+  </div>
+
+  <div id="leagueScreen" class="container hidden">
+    <h2 id="leagueTitle"></h2>
+    <div id="adminSection">
+      <input type="text" id="teamName" placeholder="Enter team name" />
+      <button onclick="addTeam()">Add Team</button>
+      <button onclick="generateFixtures()">Generate Fixtures</button>
+    </div>
+    <h3>Teams</h3>
+    <ul id="teamList"></ul>
+
+    <h3>Fixtures</h3>
+    <div id="fixtures"></div>
+
+    <h3>League Table</h3>
+    <table>
+      <thead>
+        <tr><th>Team</th><th>Played</th><th>Points</th></tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+
+    <button onclick="goHome()">Exit</button>
+  </div>
+
+  <script>
+    let currentLeague = null;
+    let leagues = JSON.parse(localStorage.getItem('leagues') || '{}');
+
+    function goHome() {
+      document.getElementById('home').classList.remove('hidden');
+      document.getElementById('joinLeague').classList.add('hidden');
+      document.getElementById('leagueScreen').classList.add('hidden');
+    }
+
+    function createLeague() {
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      leagues[code] = { teams: [], fixtures: [] };
+      localStorage.setItem('leagues', JSON.stringify(leagues));
+      alert(`League created! Code: ${code}`);
+      openLeague(code);
+    }
+
+    function showJoin() {
+      document.getElementById('home').classList.add('hidden');
+      document.getElementById('joinLeague').classList.remove('hidden');
+    }
+
+    function joinLeague() {
+      const code = document.getElementById('joinCode').value.trim().toUpperCase();
+      if (leagues[code]) {
+        openLeague(code);
+      } else {
+        alert('Invalid code!');
+      }
+    }
+
+    function openLeague(code) {
+      currentLeague = code;
+      document.getElementById('home').classList.add('hidden');
+      document.getElementById('joinLeague').classList.add('hidden');
+      document.getElementById('leagueScreen').classList.remove('hidden');
+      document.getElementById('leagueTitle').innerText = `League Code: ${code}`;
+      renderTeams();
+      renderFixtures();
+      renderTable();
+    }
+
+    function addTeam() {
+      const name = document.getElementById('teamName').value.trim();
+      if (!name) return alert('Enter a team name!');
+      leagues[currentLeague].teams.push({ name, played: 0, points: 0 });
+      localStorage.setItem('leagues', JSON.stringify(leagues));
+      document.getElementById('teamName').value = '';
+      renderTeams();
+    }
+
+    function renderTeams() {
+      const list = document.getElementById('teamList');
+      list.innerHTML = '';
+      leagues[currentLeague].teams.forEach(t => {
+        const li = document.createElement('li');
+        li.textContent = t.name;
+        list.appendChild(li);
+      });
+    }
+
+    function generateFixtures() {
+      const teams = leagues[currentLeague].teams;
+      if (teams.length < 2) return alert('Need at least 2 teams!');
+      const fixtures = [];
+      for (let i = 0; i < teams.length; i++) {
+        for (let j = i + 1; j < teams.length; j++) {
+          fixtures.push({ home: teams[i].name, away: teams[j].name, homeScore: '', awayScore: '' });
+        }
+      }
+      leagues[currentLeague].fixtures = fixtures;
+      localStorage.setItem('leagues', JSON.stringify(leagues));
+      renderFixtures();
+    }
+
+    function renderFixtures() {
+      const div = document.getElementById('fixtures');
+      div.innerHTML = '';
+      const fixtures = leagues[currentLeague].fixtures;
+      fixtures.forEach((f, i) => {
+        const line = document.createElement('div');
+        line.innerHTML = `
+          ${f.home} vs ${f.away} 
+          <input type="number" id="hs${i}" value="${f.homeScore}" placeholder="0" min="0" style="width:40px" /> -
+          <input type="number" id="as${i}" value="${f.awayScore}" placeholder="0" min="0" style="width:40px" />
+          <button onclick="saveScore(${i})">Save</button>
+        `;
+        div.appendChild(line);
+      });
+    }
+
+    function saveScore(i) {
+      const hs = parseInt(document.getElementById(`hs${i}`).value || 0);
+      const as = parseInt(document.getElementById(`as${i}`).value || 0);
+      const f = leagues[currentLeague].fixtures[i];
+      f.homeScore = hs;
+      f.awayScore = as;
+
+      leagues[currentLeague].teams.forEach(t => {
+        t.played = 0;
+        t.points = 0;
+      });
+
+      leagues[currentLeague].fixtures.forEach(match => {
+        const home = leagues[currentLeague].teams.find(t => t.name === match.home);
+        const away = leagues[currentLeague].teams.find(t => t.name === match.away);
+        if (home && away && match.homeScore !== '' && match.awayScore !== '') {
+          home.played++;
+          away.played++;
+          if (match.homeScore > match.awayScore) home.points += 3;
+          else if (match.homeScore < match.awayScore) away.points += 3;
+          else { home.points += 1; away.points += 1; }
+        }
+      });
+
+      localStorage.setItem('leagues', JSON.stringify(leagues));
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+      const teams = [...leagues[currentLeague].teams].sort((a,b) => b.points - a.points);
+      teams.forEach(t => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${t.name}</td><td>${t.played}</td><td>${t.points}</td>`;
+        tbody.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
